@@ -20,6 +20,8 @@
 #include "nvs_flash.h"
 #include "esp_eap_client.h"
 #include "esp_event.h"
+#include "esp_timer.h"
+#include "driver/gpio.h"
 
 #include "freertos/event_groups.h"
 #include "esp_wifi.h"
@@ -751,6 +753,58 @@ static void setLogLevel(void)
     }
 }
 
+//-----------------------------------------------------------------------------
+// LED Functions
+//-----------------------------------------------------------------------------
+#define LED_GPIO_D4             12
+#define LED_GPIO_D5             13
+int LedState = 0;
+
+void led_loop(void) {
+  if (LedState & 1) {
+    gpio_set_level(LED_GPIO_D4, 0);
+    gpio_set_level(LED_GPIO_D5, 1);
+  } else {
+    gpio_set_level(LED_GPIO_D4, 1);
+    gpio_set_level(LED_GPIO_D5, 0);
+  }
+  LedState ^= 1;
+}
+
+static void periodic_timer_callback(void* arg) {
+  // ESP_LOGI(TAG, "periodic_timer_callback");
+  led_loop();
+}
+
+void init_led(void) {
+  // ESP_LOGI(TAG, "init_led_ESP_LOGI");
+  gpio_reset_pin(LED_GPIO_D4); // 重置引腳配置，確保從乾淨狀態開始
+  gpio_reset_pin(LED_GPIO_D5); // 重置引腳配置，確保從乾淨狀態開始
+  gpio_set_direction(LED_GPIO_D4, GPIO_MODE_OUTPUT); // 設定為輸出模式
+  gpio_set_direction(LED_GPIO_D5, GPIO_MODE_OUTPUT); // 設定為輸出模式
+    
+  //
+  // 定義 esp_timer 的屬性
+  //
+  const esp_timer_create_args_t periodic_timer_args = {
+          .callback = &periodic_timer_callback,
+          .name = "periodic_led_timer" // 給計時器一個名稱，用於日誌和除錯
+  };
+  esp_timer_handle_t periodic_timer;     
+  //
+  // 建立 esp_timer
+  //
+  ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
+  //
+  // 啟動週期性計時器，每 1 秒 (1,000,000 微秒) 觸發一次
+  // esp_timer 的時間單位是微秒 (us)
+  //
+  ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 1000000));
+}
+
+//-----------------------------------------------------------------------------
+// Main()
+//-----------------------------------------------------------------------------
 void app_main(void)
 {
     initialize_nvs();
@@ -917,6 +971,8 @@ void app_main(void)
 #endif // CONFIG_LOG_COLORS
     }
 
+    init_led();
+    
     /* Main loop */
     while (true)
     {
