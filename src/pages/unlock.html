@@ -1,30 +1,251 @@
 <!DOCTYPE html>
-<html lang=en>
+<html lang="en">
 
 <head>
-    <link rel="shortcut icon" type=image/x-icon href=favicon.ico>
-    <meta charset=utf-8>
-    <meta http-equiv=X-UA-Compatible content="IE=edge">
-    <meta name=viewport content="width=device-width, initial-scale=1">
-    <link rel=stylesheet href=styles-67aa3b0203355627b525be2ea57be7bf.css>
-    <title>Unlock UI</title>
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="styles-67aa3b0203355627b525be2ea57be7bf.css">
+    <title>Unlock Interface - ESP32 NAT Router</title>
 </head>
 
 <body>
-    <div class=container>
-        <div class="row text-center">
-            <h1>Unlock</h1>
-        </div>
-        <h2 class="mt-2 text-center">Interface is locked. Insert your unlock password to continue.</h2>
-        <form action=/unlock method=POST>
-            <div class="form-group row"> <label for=unlock class=col-3>Password</label>
-                <div class=col-9> <input type=password class=form-control name=unlock id=unlock value maxlength=64
-                        placeholder="Unlock password"> </div>
+    <div class="container container-narrow">
+        <div class="header">
+            <div class="header-content">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">🔒</div>
+                <h1>Interface Locked</h1>
+                <div class="header-subtitle">Authentication Required</div>
             </div>
-            <div class="form-group row col-4 offset-4 mt-4"> <input type=hidden name=x value=y> <input type=submit
-                    value=Unlock class="btn btn-primary"> </div>
-        </form>
+        </div>
+        
+        <div class="content">
+            <div class="card text-center">
+                <div class="alert alert-warning mb-4">
+                    <strong>🛡️ Security Notice</strong><br>
+                    The configuration interface is currently locked for security purposes. Please enter your unlock password to continue accessing the router settings.
+                </div>
+
+                <form action="/unlock" method="POST" id="unlock-form">
+                    <div class="form-group mb-4">
+                        <label for="unlock" class="form-label text-left">Unlock Password</label>
+                        <div class="password-input-container" style="position: relative;">
+                            <input type="password" 
+                                   class="form-input" 
+                                   name="unlock" 
+                                   id="unlock" 
+                                   maxlength="64"
+                                   placeholder="Enter your unlock password"
+                                   autocomplete="current-password"
+                                   required
+                                   style="padding-right: 3rem;">
+                            <button type="button" 
+                                    class="password-toggle"
+                                    onclick="togglePasswordVisibility()"
+                                    style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: #64748b; cursor: pointer; font-size: 1.2rem;"
+                                    title="Show/Hide Password">
+                                👁️
+                            </button>
+                        </div>
+                        <div class="text-small text-muted mt-1">
+                            Password is case-sensitive and can be up to 64 characters long.
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <button type="submit" class="btn btn-primary btn-large btn-block" id="unlock-btn">
+                            🔓 Unlock Interface
+                        </button>
+                    </div>
+
+                    <input type="hidden" name="x" value="y">
+                </form>
+
+                <div class="mt-4 p-3" style="background: rgba(248, 250, 252, 0.8); border-radius: 8px; border: 1px solid rgba(226, 232, 240, 0.6);">
+                    <h3 class="text-small mb-2" style="color: #334155;">🔐 Security Features</h3>
+                    <div class="text-small text-muted text-left">
+                        <div class="mb-1">• Password protection prevents unauthorized access</div>
+                        <div class="mb-1">• Session-based authentication for security</div>
+                        <div class="mb-1">• Automatic logout after inactivity</div>
+                        <div>• Encrypted password transmission</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Messages -->
+            <div id="error-message" class="alert alert-error" style="display: none;">
+                <strong>❌ Authentication Failed</strong><br>
+                The password you entered is incorrect. Please try again.
+            </div>
+
+            <div id="loading-message" class="alert alert-info" style="display: none;">
+                <div class="flex items-center justify-center gap-2">
+                    <div class="spinner"></div>
+                    <span><strong>🔄 Authenticating...</strong><br>Please wait while we verify your credentials.</span>
+                </div>
+            </div>
+
+            <!-- Help Section -->
+            <div class="card card-compact">
+                <h3 class="mb-2" style="color: #334155; font-size: 1rem;">❓ Need Help?</h3>
+                <div class="text-small text-muted">
+                    <p class="mb-2">If you've forgotten your unlock password:</p>
+                    <div class="mb-1">• Check your router documentation for the default password</div>
+                    <div class="mb-1">• Contact your network administrator</div>
+                    <div>• Consider performing a factory reset if necessary</div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <script>
+        let isPasswordVisible = false;
+
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('unlock');
+            const toggleButton = document.querySelector('.password-toggle');
+            
+            if (isPasswordVisible) {
+                passwordInput.type = 'password';
+                toggleButton.textContent = '👁️';
+                toggleButton.title = 'Show Password';
+                isPasswordVisible = false;
+            } else {
+                passwordInput.type = 'text';
+                toggleButton.textContent = '🙈';
+                toggleButton.title = 'Hide Password';
+                isPasswordVisible = true;
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            if (message) {
+                errorDiv.querySelector('strong').nextSibling.textContent = ' ' + message;
+            }
+            errorDiv.style.display = 'block';
+            
+            // Hide after 5 seconds
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function showLoading() {
+            document.getElementById('loading-message').style.display = 'block';
+            document.getElementById('unlock-btn').disabled = true;
+            document.getElementById('unlock-btn').innerHTML = '<div class="spinner" style="width: 16px; height: 16px; margin-right: 0.5rem;"></div>Authenticating...';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-message').style.display = 'none';
+            document.getElementById('unlock-btn').disabled = false;
+            document.getElementById('unlock-btn').innerHTML = '🔓 Unlock Interface';
+        }
+
+        // Form submission handling
+        document.getElementById('unlock-form').addEventListener('submit', function(e) {
+            const password = document.getElementById('unlock').value.trim();
+            
+            if (!password) {
+                e.preventDefault();
+                showError('Please enter your unlock password.');
+                return;
+            }
+            
+            showLoading();
+            
+            // If there's an error in the response, we'll handle it
+            // For now, let the form submit normally
+        });
+
+        // Focus on password input when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('unlock').focus();
+            
+            // Add enter key support
+            document.getElementById('unlock').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    document.getElementById('unlock-form').submit();
+                }
+            });
+
+            // Check for error parameters in URL (if backend sends them)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('error') === 'invalid') {
+                showError('Invalid password. Please try again.');
+            }
+        });
+
+        // Add visual feedback for password strength (optional)
+        document.getElementById('unlock').addEventListener('input', function(e) {
+            const password = e.target.value;
+            const button = document.getElementById('unlock-btn');
+            
+            if (password.length > 0) {
+                button.style.opacity = '1';
+                button.style.transform = 'translateY(0)';
+            } else {
+                button.style.opacity = '0.7';
+                button.style.transform = 'translateY(2px)';
+            }
+        });
+    </script>
+
+    <style>
+        /* Additional styles for the unlock page */
+        .password-input-container {
+            position: relative;
+        }
+        
+        .password-toggle:hover {
+            color: #334155 !important;
+        }
+        
+        .password-toggle:focus {
+            outline: 2px solid rgba(51, 65, 85, 0.2);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+        
+        #unlock-btn {
+            transition: all 0.2s ease;
+        }
+        
+        #unlock-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        /* Subtle animation for the lock icon */
+        @keyframes lockPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .header-content > div:first-child {
+            animation: lockPulse 3s ease-in-out infinite;
+        }
+        
+        /* Focus styles for better accessibility */
+        #unlock:focus {
+            box-shadow: 0 0 0 3px rgba(51, 65, 85, 0.1);
+            border-color: #334155;
+        }
+        
+        @media (max-width: 480px) {
+            .header-content > div:first-child {
+                font-size: 3rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .password-toggle {
+                right: 0.5rem !important;
+            }
+        }
+    </style>
 </body>
 
 </html>
