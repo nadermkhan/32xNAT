@@ -1,42 +1,483 @@
 <!DOCTYPE html>
-<html lang=en>
+<html lang="en">
 
 <head>
-    <link rel="shortcut icon" type=image/x-icon href=favicon.ico>
-    <meta charset=utf-8>
-    <meta http-equiv=X-UA-Compatible content="IE=edge">
-    <meta name=viewport content="width=device-width, initial-scale=1">
-    <link rel=stylesheet href=styles-67aa3b0203355627b525be2ea57be7bf.css>
-    <title>Lock UI</title>
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="styles-67aa3b0203355627b525be2ea57be7bf.css">
+    <title>Lock Interface - ESP32 NAT Router</title>
 </head>
 
 <body>
-    <div class=container>
-        <div class="row text-center">
-            <h1>Lock UI</h1>
+    <div class="container container-narrow">
+        <div class="header">
+            <div class="header-content">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">🔐</div>
+                <h1>Interface Security</h1>
+                <div class="header-subtitle">Lock Configuration</div>
+            </div>
         </div>
-        <h2 class="mt-2 text-center">To lock interface insert a password twice.</h2>
-        <form action=/lock method=POST>
-            <div class="form-group row"> <label for=lockpass class=col-3>Password</label>
-                <div class=col-9> <input type=password class=form-control name=lockpass id=lockpass value maxlength=64
-                        placeholder="Lock password"> </div>
+        
+        <div class="content">
+            <div class="card">
+                <div class="alert alert-info mb-4">
+                    <strong>🛡️ Security Configuration</strong><br>
+                    Set up a password to protect your router's configuration interface from unauthorized access. This adds an extra layer of security to your device.
+                </div>
+
+                <form action="/lock" method="POST" id="lock-form">
+                    <div class="form-group mb-3">
+                        <label for="lockpass" class="form-label">New Lock Password</label>
+                        <div class="password-input-container" style="position: relative;">
+                            <input type="password" 
+                                   class="form-input" 
+                                   name="lockpass" 
+                                   id="lockpass" 
+                                   maxlength="64"
+                                   placeholder="Enter a secure password"
+                                   autocomplete="new-password"
+                                   style="padding-right: 3rem;">
+                            <button type="button" 
+                                    class="password-toggle"
+                                    onclick="togglePasswordVisibility('lockpass')"
+                                    style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: #64748b; cursor: pointer; font-size: 1.2rem;"
+                                    title="Show/Hide Password">
+                                👁️
+                            </button>
+                        </div>
+                        <div class="text-small text-muted mt-1">
+                            Choose a strong password with at least 8 characters.
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label for="lockpass2" class="form-label">Confirm Password</label>
+                        <div class="password-input-container" style="position: relative;">
+                            <input type="password" 
+                                   class="form-input" 
+                                   name="lockpass2" 
+                                   id="lockpass2" 
+                                   maxlength="64"
+                                   placeholder="Repeat the password"
+                                   autocomplete="new-password"
+                                   style="padding-right: 3rem;">
+                            <button type="button" 
+                                    class="password-toggle"
+                                    onclick="togglePasswordVisibility('lockpass2')"
+                                    style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: #64748b; cursor: pointer; font-size: 1.2rem;"
+                                    title="Show/Hide Password">
+                                👁️
+                            </button>
+                        </div>
+                        <div class="text-small text-muted mt-1">
+                            Must match the password above.
+                        </div>
+                    </div>
+
+                    <!-- Password Strength Indicator -->
+                    <div class="mb-3">
+                        <div class="text-small mb-1">Password Strength:</div>
+                        <div class="progress">
+                            <div class="progress-bar" id="strength-bar" style="width: 0%;"></div>
+                        </div>
+                        <div class="text-small text-muted mt-1" id="strength-text">Enter a password to see strength</div>
+                    </div>
+
+                    <div class="alert alert-warning mb-4">
+                        <strong>💡 Important Notes:</strong><br>
+                        • Leave both fields empty to remove password protection<br>
+                        • You'll need this password to access the interface after locking<br>
+                        • Store this password securely - there's no recovery option<br>
+                        • Consider using a password manager for secure storage
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <button type="submit" class="btn btn-primary btn-large btn-block" id="save-btn">
+                            🔒 Set Lock Password
+                        </button>
+                    </div>
+
+                    <input type="hidden" name="x" value="y">
+                </form>
+
+                <!-- Remove Password Section -->
+                <div style="display: %s;" id="remove-section">
+                    <div class="mt-4 p-3" style="background: rgba(239, 68, 68, 0.05); border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.2);">
+                        <h3 class="mb-2" style="color: #dc2626; font-size: 1.1rem;">⚠️ Remove Password Protection</h3>
+                        <p class="text-small text-muted mb-3">
+                            This will completely remove password protection from the interface. Anyone with network access will be able to configure your router.
+                        </p>
+                        
+                        <form action="/lock" method="POST" id="remove-form">
+                            <input type="hidden" name="lockpass" value="">
+                            <input type="hidden" name="lockpass2" value="">
+                            <input type="hidden" name="x" value="y">
+                            <button type="submit" class="btn btn-danger" onclick="return confirmRemoval()">
+                                🗑️ Remove Password Protection
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
-            <div class="form-group row mt-2"> <label for=lockpass2 class=col-3>Repeat</label>
-                <div class=col-9> <input type=password class=form-control name=lockpass2 id=lockpass2 value maxlength=64
-                        placeholder=Repeat> </div>
+
+            <!-- Security Tips -->
+            <div class="card card-compact">
+                <h3 class="mb-2" style="color: #334155; font-size: 1rem;">🔐 Security Best Practices</h3>
+                <div class="text-small text-muted">
+                    <div class="mb-1">• Use a unique password not used elsewhere</div>
+                    <div class="mb-1">• Include uppercase, lowercase, numbers, and symbols</div>
+                    <div class="mb-1">• Avoid personal information or common words</div>
+                    <div class="mb-1">• Consider using a passphrase with multiple words</div>
+                    <div>• Enable this feature especially on public networks</div>
+                </div>
             </div>
-            <div class="form-group row col-9 offset-3"> <small class="form-text text-muted">Both fields empty will
-                    remove the password</small> </div>
-            <div class="form-group row col-4 offset-4 mt-4"> <input type=hidden name=x value=y> <input type=submit
-                    value=Save class="btn btn-primary"> </div>
-        </form>
-        <form action=/lock method=POST style="display: %s;">
-            <div class="form-group row col-4 offset-4 mt-2"> <input type=hidden name=lockpass value> <input type=hidden
-                    name=lockpass2 value> <input type=hidden name=x value=y> <input type=submit value="Remove password"
-                    class="btn btn-warning"> </div>
-        </form>
-        <div class="form-group row col-4 offset-4 mt-5"> <a href=/ class="btn btn-light">Back</a> </div>
+
+            <!-- Status Messages -->
+            <div id="error-message" class="alert alert-error" style="display: none;">
+                <strong>❌ Error</strong><br>
+                <span id="error-text"></span>
+            </div>
+
+            <div id="success-message" class="alert alert-success" style="display: none;">
+                <strong>✅ Success</strong><br>
+                Password protection has been configured successfully.
+            </div>
+
+            <!-- Navigation -->
+            <div class="back-section">
+                <a href="/" class="btn btn-secondary back-icon">Back to Configuration</a>
+            </div>
+        </div>
     </div>
+
+    <script>
+        let passwordVisibility = {
+            lockpass: false,
+            lockpass2: false
+        };
+
+        function togglePasswordVisibility(fieldId) {
+            const field = document.getElementById(fieldId);
+            const button = field.nextElementSibling;
+            
+            if (passwordVisibility[fieldId]) {
+                field.type = 'password';
+                button.textContent = '👁️';
+                button.title = 'Show Password';
+                passwordVisibility[fieldId] = false;
+            } else {
+                field.type = 'text';
+                button.textContent = '🙈';
+                button.title = 'Hide Password';
+                passwordVisibility[fieldId] = true;
+            }
+        }
+
+        function calculatePasswordStrength(password) {
+            let strength = 0;
+            let feedback = [];
+
+            if (password.length === 0) {
+                return { strength: 0, feedback: 'Enter a password to see strength', color: 'rgba(148, 163, 184, 0.5)' };
+            }
+
+            // Length check
+            if (password.length >= 8) strength += 25;
+            else feedback.push('at least 8 characters');
+
+            // Uppercase check
+            if (/[A-Z]/.test(password)) strength += 25;
+            else feedback.push('uppercase letters');
+
+            // Lowercase check
+            if (/[a-z]/.test(password)) strength += 25;
+            else feedback.push('lowercase letters');
+
+            // Number or symbol check
+            if (/[\d\W]/.test(password)) strength += 25;
+            else feedback.push('numbers or symbols');
+
+            let strengthText, color;
+            if (strength < 25) {
+                strengthText = 'Very Weak';
+                color = '#dc2626';
+            } else if (strength < 50) {
+                strengthText = 'Weak';
+                color = '#f59e0b';
+            } else if (strength < 75) {
+                strengthText = 'Good';
+                color = '#d97706';
+            } else if (strength < 100) {
+                strengthText = 'Strong';
+                color = '#059669';
+            } else {
+                strengthText = 'Very Strong';
+                color = '#10b981';
+            }
+
+            if (feedback.length > 0) {
+                strengthText += ` (add: ${feedback.join(', ')})`;
+            }
+
+            return { strength, feedback: strengthText, color };
+        }
+
+        function updatePasswordStrength() {
+            const password = document.getElementById('lockpass').value;
+            const result = calculatePasswordStrength(password);
+            
+            const strengthBar = document.getElementById('strength-bar');
+            const strengthText = document.getElementById('strength-text');
+            
+            strengthBar.style.width = result.strength + '%';
+            strengthBar.style.backgroundColor = result.color;
+            strengthText.textContent = result.feedback;
+            strengthText.style.color = result.color;
+        }
+
+        function validatePasswords() {
+            const password1 = document.getElementById('lockpass').value;
+            const password2 = document.getElementById('lockpass2').value;
+            let errors = [];
+
+            // Check if passwords match
+            if (password1 !== password2) {
+                errors.push('Passwords do not match');
+            }
+
+            // Check minimum length (if not empty)
+            if (password1.length > 0 && password1.length < 8) {
+                errors.push('Password must be at least 8 characters long');
+            }
+
+            return errors;
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            const errorText = document.getElementById('error-text');
+            errorText.textContent = message;
+            errorDiv.style.display = 'block';
+            
+            // Hide after 5 seconds
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function showSuccess() {
+            const successDiv = document.getElementById('success-message');
+            successDiv.style.display = 'block';
+            
+            // Hide after 3 seconds
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        function confirmRemoval() {
+            return confirm('Are you sure you want to remove password protection?\n\nThis will make your router configuration accessible to anyone on the network.\n\nClick OK to confirm or Cancel to keep protection.');
+        }
+
+        // Form submission handler
+        document.getElementById('lock-form').addEventListener('submit', function(e) {
+            const errors = validatePasswords();
+            
+            if (errors.length > 0) {
+                e.preventDefault();
+                showError(errors.join('. '));
+                return false;
+            }
+
+            // Show loading state
+            const submitButton = document.getElementById('save-btn');
+            const originalText = submitButton.innerHTML;
+            submitButton.innerHTML = '<div class="spinner" style="width: 16px; height: 16px; margin-right: 0.5rem;"></div>Saving...';
+            submitButton.disabled = true;
+
+            // Re-enable button after 5 seconds (in case of error)
+            setTimeout(() => {
+                submitButton.innerHTML = originalText;
+                submitButton.disabled = false;
+            }, 5000);
+        });
+
+        // Real-time password validation
+        document.getElementById('lockpass').addEventListener('input', function() {
+            updatePasswordStrength();
+            
+            // Clear previous errors
+            document.getElementById('error-message').style.display = 'none';
+        });
+
+        document.getElementById('lockpass2').addEventListener('input', function() {
+            const password1 = document.getElementById('lockpass').value;
+            const password2 = this.value;
+            
+            // Visual feedback for password match
+            if (password2.length > 0) {
+                if (password1 === password2) {
+                    this.style.borderColor = 'rgba(34, 197, 94, 0.5)';
+                } else {
+                    this.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                }
+            } else {
+                this.style.borderColor = '';
+            }
+            
+            // Clear previous errors
+            document.getElementById('error-message').style.display = 'none';
+        });
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Focus on first password field
+            document.getElementById('lockpass').focus();
+            
+            // Initialize password strength
+            updatePasswordStrength();
+            
+            // Add animation to cards
+            const cards = document.querySelectorAll('.card');
+            cards.forEach((card, index) => {
+                card.style.animation = `fadeIn 0.6s ease-out ${index * 0.1}s both`;
+            });
+        });
+    </script>
+
+    <style>
+        /* Additional styles for the lock page */
+        .password-input-container {
+            position: relative;
+        }
+        
+        .password-toggle:hover {
+            color: #334155 !important;
+        }
+        
+        .password-toggle:focus {
+            outline: 2px solid rgba(51, 65, 85, 0.2);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+        
+        .progress {
+            height: 6px;
+            background: rgba(226, 232, 240, 0.5);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            border-radius: 3px;
+            transition: all 0.3s ease;
+        }
+        
+        #save-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        /* Form validation styles */
+        .form-input:invalid {
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+        
+        /* Subtle animation for the lock icon */
+        @keyframes lockPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .header-content > div:first-child {
+            animation: lockPulse 3s ease-in-out infinite;
+        }
+        
+        @media (max-width: 480px) {
+            .header-content > div:first-child {
+                font-size: 3rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .password-toggle {
+                right: 0.5rem !important;
+            }
+            
+            .btn-block {
+                width: 100%;
+            }
+        }
+        
+        /* Enhanced visual feedback */
+        .form-input:focus {
+            box-shadow: 0 0 0 3px rgba(51, 65, 85, 0.1);
+            border-color: #334155;
+        }
+        
+        /* Smooth transitions for dynamic content */
+        #remove-section {
+            transition: all 0.3s ease;
+        }
+        
+        /* Alert animations */
+        .alert {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Password strength indicator styling */
+        #strength-text {
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+        
+        /* Remove section styling */
+        #remove-section .btn-danger:hover {
+            background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%);
+            transform: translateY(-1px);
+        }
+        
+        /* Loading state for buttons */
+        .btn:disabled .spinner {
+            border-color: rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+        }
+        
+        /* Focus management */
+        .form-input:focus + .password-toggle {
+            color: #334155;
+        }
+        
+        /* Accessibility improvements */
+        .password-toggle:focus-visible {
+            outline: 2px solid #334155;
+            outline-offset: 2px;
+        }
+        
+        /* Enhanced card styling for remove section */
+        #remove-section > div {
+            transition: all 0.2s ease;
+        }
+        
+        #remove-section > div:hover {
+            background: rgba(239, 68, 68, 0.08) !important;
+            border-color: rgba(239, 68, 68, 0.3) !important;
+        }
+    </style>
 </body>
 
 </html>
