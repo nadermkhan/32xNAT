@@ -4,51 +4,29 @@
 
 #include <sys/param.h>
 #include <timer.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "nvs.h"
 #include "cmd_nvs.h"
 #include "router_globals.h"
 #include "esp_wifi.h"
-
 #include "esp_log.h"
 
-// Add UTF-8 validation and safe SSID handling
-esp_err_t validate_and_process_ssid(const char* raw_ssid, char* processed_ssid, size_t max_len) {
-    if (!raw_ssid || !processed_ssid) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    // First, URL decode the SSID to handle UTF-8 characters properly
-    size_t decoded_len = url_decode(raw_ssid, processed_ssid, max_len - 1);
-    if (decoded_len == 0) {
-        ESP_LOGE(TAG, "Failed to decode SSID");
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    processed_ssid[decoded_len] = '\0';
-    
-    // Validate UTF-8 and length
-    if (!is_valid_utf8(processed_ssid)) {
-        ESP_LOGE(TAG, "SSID contains invalid UTF-8 sequences");
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    // Check WiFi SSID length limits (32 bytes max)
-    if (strlen(processed_ssid) > 32) {
-        ESP_LOGW(TAG, "SSID too long (%d bytes), truncating to 32 bytes", strlen(processed_ssid));
-        // Find safe UTF-8 truncation point
-        size_t safe_len = 32;
-        while (safe_len > 0 && (processed_ssid[safe_len] & 0x80) && !(processed_ssid[safe_len] & 0x40)) {
-            safe_len--;
-        }
-        processed_ssid[safe_len] = '\0';
-    }
-    
-    return ESP_OK;
-}
+static const char *TAG = "ApplyHandler";
 
-// Add URL decoding function for UTF-8 support
+// Forward declarations
+size_t url_decode(const char* src, char* dest, size_t dest_size);
+bool is_valid_utf8(const char* str);
+esp_err_t validate_and_process_ssid(const char* raw_ssid, char* processed_ssid, size_t max_len);
+
+// URL decoding function for UTF-8 support
 size_t url_decode(const char* src, char* dest, size_t dest_size) {
+    if (!src || !dest || dest_size == 0) {
+        return 0;
+    }
+    
     size_t src_len = strlen(src);
     size_t dest_idx = 0;
     
@@ -71,11 +49,14 @@ size_t url_decode(const char* src, char* dest, size_t dest_size) {
         }
     }
     
+    dest[dest_idx] = '\0';
     return dest_idx;
 }
 
-// Add UTF-8 validation function
+// UTF-8 validation function
 bool is_valid_utf8(const char* str) {
+    if (!str) return false;
+    
     const unsigned char* bytes = (const unsigned char*)str;
     while (*bytes) {
         if ((*bytes & 0x80) == 0) {
@@ -100,7 +81,38 @@ bool is_valid_utf8(const char* str) {
     return true;
 }
 
-static const char *TAG = "ApplyHandler";
+// UTF-8 safe SSID validation and processing
+esp_err_t validate_and_process_ssid(const char* raw_ssid, char* processed_ssid, size_t max_len) {
+    if (!raw_ssid || !processed_ssid || max_len == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // First, URL decode the SSID to handle UTF-8 characters properly
+    size_t decoded_len = url_decode(raw_ssid, processed_ssid, max_len - 1);
+    if (decoded_len == 0) {
+        ESP_LOGE(TAG, "Failed to decode SSID");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // Validate UTF-8
+    if (!is_valid_utf8(processed_ssid)) {
+        ESP_LOGE(TAG, "SSID contains invalid UTF-8 sequences");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // Check WiFi SSID length limits (32 bytes max)
+    if (strlen(processed_ssid) > 32) {
+        ESP_LOGW(TAG, "SSID too long (%d bytes), truncating to 32 bytes", strlen(processed_ssid));
+        // Find safe UTF-8 truncation point
+        size_t safe_len = 32;
+        while (safe_len > 0 && (processed_ssid[safe_len] & 0x80) && !(processed_ssid[safe_len] & 0x40)) {
+            safe_len--;
+        }
+        processed_ssid[safe_len] = '\0';
+    }
+    
+    return ESP_OK;
+}
 
 void setApByQuery(char *urlContent, nvs_handle_t nvs)
 {
@@ -110,26 +122,28 @@ void setApByQuery(char *urlContent, nvs_handle_t nvs)
     
     // Handle AP SSID with UTF-8 support
     readUrlParameterIntoBuffer(urlContent, "ap_ssid", param, contentLength);
-    if (validate_and_process_ssid(param, processed_ssid, sizeof(processed_ssid)) == ESP_OK) {
-        ESP_LOGI(TAG, "Setting AP SSID to: %s", processed_ssid);
-        ESP_ERROR_CHECK(nvs_set_str(nvs, "ap_ssid", processed_ssid));
-    } else {
-        ESP_LOGE(TAG, "Invalid AP SSID, keeping current setting");
+    if (strlen(param) > 0) {
+        if (validate_and_process_ssid(param, processed_ssid, sizeof(processed_ssid)) == ESP_OK) {
+            ESP_LOGI(TAG, "Setting AP SSID to: %s", processed_ssid);
+            ESP_ERROR_CHECK(nvs_set_str(nvs, "ap_ssid", processed_ssid));
+        } else {
+            ESP_LOGE(TAG, "Invalid AP SSID, keeping current setting");
+        }
     }
     
-    // Handle AP password
+    // Handle AP password with URL decoding
     readUrlParameterIntoBuffer(urlContent, "ap_password", param, contentLength);
-    char decoded_password[256];
-    size_t pwd_len = url_decode(param, decoded_password, sizeof(decoded_password));
-    decoded_password[pwd_len] = '\0';
-    
-    if (strlen(decoded_password) < 8) {
-        nvs_erase_key(nvs, "ap_passwd");
-    } else {
-        ESP_ERROR_CHECK(nvs_set_str(nvs, "ap_passwd", decoded_password));
+    if (strlen(param) > 0) {
+        char decoded_password[256];
+        size_t pwd_len = url_decode(param, decoded_password, sizeof(decoded_password));
+        
+        if (strlen(decoded_password) < 8) {
+            nvs_erase_key(nvs, "ap_passwd");
+        } else {
+            ESP_ERROR_CHECK(nvs_set_str(nvs, "ap_passwd", decoded_password));
+        }
     }
 
-    // Handle hidden SSID setting
     readUrlParameterIntoBuffer(urlContent, "ssid_hidden", param, contentLength);
     if (strcmp(param, "on") == 0) {
         ESP_LOGI(TAG, "AP-SSID should be hidden.");
@@ -147,20 +161,22 @@ void setStaByQuery(char *urlContent, nvs_handle_t nvs)
     
     // Handle STA SSID with UTF-8 support
     readUrlParameterIntoBuffer(urlContent, "ssid", param, contentLength);
-    if (validate_and_process_ssid(param, processed_ssid, sizeof(processed_ssid)) == ESP_OK) {
-        ESP_LOGI(TAG, "Setting STA SSID to: %s", processed_ssid);
-        ESP_ERROR_CHECK(nvs_set_str(nvs, "ssid", processed_ssid));
-    } else {
-        ESP_LOGE(TAG, "Invalid STA SSID, keeping current setting");
+    if (strlen(param) > 0) {
+        if (validate_and_process_ssid(param, processed_ssid, sizeof(processed_ssid)) == ESP_OK) {
+            ESP_LOGI(TAG, "Setting STA SSID to: %s", processed_ssid);
+            ESP_ERROR_CHECK(nvs_set_str(nvs, "ssid", processed_ssid));
+        } else {
+            ESP_LOGE(TAG, "Invalid STA SSID, keeping current setting");
+        }
     }
     
     // Handle STA password with URL decoding
     readUrlParameterIntoBuffer(urlContent, "password", param, contentLength);
-    char decoded_password[256];
-    size_t pwd_len = url_decode(param, decoded_password, sizeof(decoded_password));
-    decoded_password[pwd_len] = '\0';
-    
-    ESP_ERROR_CHECK(nvs_set_str(nvs, "passwd", decoded_password));
+    if (strlen(param) > 0) {
+        char decoded_password[256];
+        size_t pwd_len = url_decode(param, decoded_password, sizeof(decoded_password));
+        ESP_ERROR_CHECK(nvs_set_str(nvs, "passwd", decoded_password));
+    }
 }
 
 void setWpa2(char *urlContent, nvs_handle_t nvs)
@@ -336,7 +352,7 @@ void applyAdvancedConfig(char *buf)
         if (strcmp("random", param) == 0)
         {
             ESP_LOGI(TAG, "MAC address set to random");
-            ESP_ERROR_CHECK(nvs_set_str(nvs, "custom_mac", param));
+                        ESP_ERROR_CHECK(nvs_set_str(nvs, "custom_mac", param));
         }
         else if (strlen(macaddress) > 0)
         {
@@ -379,6 +395,7 @@ void applyAdvancedConfig(char *buf)
                     esp_ip4addr_ntoa(addr, customDnsParam, 16);
                     ESP_LOGI(TAG, "DNS set to: %s", customDnsParam);
                     ESP_ERROR_CHECK(nvs_set_str(nvs, "custom_dns", customDnsParam));
+                    free(addr);
                 }
             }
             else
@@ -429,11 +446,15 @@ void applyAdvancedConfig(char *buf)
             }
         }
     }
+    
+    // Handle hostname with URL decoding
     readUrlParameterIntoBuffer(buf, "hostname", param, contentLength);
     if (strlen(param) > 0)
     {
-        ESP_LOGI(TAG, "Set hostname to: %s", param);
-        ESP_ERROR_CHECK(nvs_set_str(nvs, "hostname", param));
+        char decoded_hostname[64];
+        url_decode(param, decoded_hostname, sizeof(decoded_hostname));
+        ESP_LOGI(TAG, "Set hostname to: %s", decoded_hostname);
+        ESP_ERROR_CHECK(nvs_set_str(nvs, "hostname", decoded_hostname));
     }
     else
     {
@@ -478,7 +499,6 @@ void applyAdvancedConfig(char *buf)
 
 esp_err_t apply_get_handler(httpd_req_t *req)
 {
-
     if (isLocked())
     {
         return redirectToLock(req);
@@ -497,6 +517,7 @@ esp_err_t apply_get_handler(httpd_req_t *req)
 
     return httpd_resp_send(req, apply_page, HTTPD_RESP_USE_STRLEN);
 }
+
 esp_err_t apply_post_handler(httpd_req_t *req)
 {
     if (isLocked())
@@ -509,7 +530,7 @@ esp_err_t apply_post_handler(httpd_req_t *req)
     int ret = 0;
     int bufferLength = req->content_len;
     ESP_LOGI(TAG, "Content length  => %d", req->content_len);
-    char buf[100]; // 1000 byte chunk
+    char buf[100]; // 100 byte chunk
     char content[bufferLength];
     strcpy(content, ""); // Fill initial
 
@@ -540,6 +561,7 @@ esp_err_t apply_post_handler(httpd_req_t *req)
 
     if (strcmp(funcParam, "config") == 0)
     {
+        ESP_LOGI(TAG, "Applying WiFi configuration with UTF-8 support");
         applyApStaConfig(content);
     }
     if (strcmp(funcParam, "erase") == 0)
